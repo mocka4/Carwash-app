@@ -106,7 +106,7 @@
           </button>
         </div>
 
-        <!-- Navigation -->
+        <!-- Plain-English Navigation -->
         <nav class="px-3 space-y-1.5">
           <button onclick="switchTab('scoreboard')" data-tab="scoreboard" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold bg-slate-800 text-white transition-all">
             <i data-lucide="gauge" class="w-5 h-5 text-sky-400"></i>
@@ -166,9 +166,9 @@
             <div class="flex items-center gap-2">
               <h2 id="header-title" class="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white leading-tight">Today's Scoreboard</h2>
               <!-- Real-Time Sync Indicator -->
-              <span id="sync-status-badge" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-                <span id="sync-status-text">Connecting to Firebase...</span>
+              <span id="sync-status-badge" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span id="sync-status-text">Synced Live</span>
               </span>
             </div>
             <p id="header-subtitle" class="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">Real-time business updates across both partners' phones</p>
@@ -808,19 +808,15 @@
 
   <!-- ==================== FIREBASE REAL-TIME ENGINE ==================== -->
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
-    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
-    import { getFirestore, doc, setDoc, deleteDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, deleteDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    // HARDCODED USER FIREBASE CONFIG FOR carwash-business-4b3e1
-    const firebaseConfig = {
-      apiKey: "AIzaSyAjovLkyOhQgRNaHrtFYlNrzJAeFfAheqQ",
-      authDomain: "carwash-business-4b3e1.firebaseapp.com",
-      projectId: "carwash-business-4b3e1",
-      storageBucket: "carwash-business-4b3e1.firebasestorage.app",
-      messagingSenderId: "171062055560",
-      appId: "1:171062055560:web:173b19ad08c81a035d453d"
-    };
+    // Global Fallbacks & Firebase Init
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'shinebay-carwash-app';
+    const firebaseConfig = typeof __firebase_config !== 'undefined' 
+      ? JSON.parse(__firebase_config) 
+      : { apiKey: "demo-key", authDomain: "demo.firebaseapp.com", projectId: "demo-proj" };
 
     let firebaseApp, auth, db;
     let currentUser = null;
@@ -835,122 +831,111 @@
       address: localStorage.getItem('shinebay_address') || 'Main Road Wash Bay',
       currency: localStorage.getItem('shinebay_currency') || 'R',
       darkMode: localStorage.getItem('shinebay_dark') === 'true',
-      tickets: JSON.parse(localStorage.getItem('local_tickets') || '[]'),
-      expenses: JSON.parse(localStorage.getItem('local_expenses') || '[]'),
-      customers: JSON.parse(localStorage.getItem('local_customers') || '[]'),
-      packages: JSON.parse(localStorage.getItem('local_packages') || '[]'),
-      supplies: JSON.parse(localStorage.getItem('local_supplies') || '[]')
+      tickets: [],
+      expenses: [],
+      customers: [],
+      packages: [],
+      supplies: []
     };
 
-    // Firebase Auth & Real-Time Sync
+    // Firebase Auth & Snapshot Sync Setup
     async function initFirebase() {
       try {
         firebaseApp = initializeApp(firebaseConfig);
         auth = getAuth(firebaseApp);
         db = getFirestore(firebaseApp);
 
-        onAuthStateChanged(auth, async (user) => {
+        // Rule 3: Auth Before Queries
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+
+        onAuthStateChanged(auth, (user) => {
           if (user) {
             currentUser = user;
             setupRealtimeSync();
           } else {
-            try {
-              const res = await signInAnonymously(auth);
-              currentUser = res.user;
-              setupRealtimeSync();
-            } catch (err) {
-              console.warn("Auth error, falling back local:", err);
-              updateSyncUI(false, "Local Mode (Offline)");
-            }
+            currentUser = null;
+            updateSyncUI(false, "Offline / Auth Needed");
           }
         });
       } catch (err) {
         console.warn("Firestore running in fallback mode:", err);
-        updateSyncUI(false, "Local Mode (Offline)");
+        updateSyncUI(false, "Local Offline Mode");
       }
     }
 
     function setupRealtimeSync() {
       if (!currentUser || !db) return;
 
-      // Clean previous listeners
+      // Clean old listeners
       unsubs.forEach(unsub => unsub());
       unsubs = [];
 
-      const cleanCode = window.appState.shopCode.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '') || 'SHINE-2026';
+      const cleanCode = window.appState.shopCode.trim().replace(/[^a-zA-Z0-9_-]/g, '') || 'SHINE-2026';
       updateSyncUI(true, `Synced Live: ${cleanCode}`);
 
-      // Path: shops/{cleanCode}/{collectionName}
+      // Rule 1: Strict Paths `/artifacts/{appId}/public/data/{collectionName}`
       const collectionsMap = {
-        tickets: collection(db, 'shops', cleanCode, 'tickets'),
-        expenses: collection(db, 'shops', cleanCode, 'expenses'),
-        customers: collection(db, 'shops', cleanCode, 'customers'),
-        packages: collection(db, 'shops', cleanCode, 'packages'),
-        supplies: collection(db, 'shops', cleanCode, 'supplies')
+        tickets: `shop_${cleanCode}_tickets`,
+        expenses: `shop_${cleanCode}_expenses`,
+        customers: `shop_${cleanCode}_customers`,
+        packages: `shop_${cleanCode}_packages`,
+        supplies: `shop_${cleanCode}_supplies`
       };
 
-      Object.entries(collectionsMap).forEach(([key, colRef]) => {
+      Object.entries(collectionsMap).forEach(([key, colName]) => {
+        const colRef = collection(db, 'artifacts', appId, 'public', 'data', colName);
+        
+        // Rule 2: Simple collection query with error callback
         const unsub = onSnapshot(colRef, (snapshot) => {
           const list = [];
           snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
-
+          
           window.appState[key] = list;
-          localStorage.setItem(`local_${key}`, JSON.stringify(list));
 
-          // Auto-seed defaults if shop key packages or supplies is empty
+          // If new shop code has 0 packages, seed defaults automatically!
           if (key === 'packages' && list.length === 0) {
-            seedDefaultPackages(cleanCode);
+            seedDefaultPackages(colName);
           }
           if (key === 'supplies' && list.length === 0) {
-            seedDefaultSupplies(cleanCode);
+            seedDefaultSupplies(colName);
           }
 
           window.renderAll();
         }, (err) => {
-          console.warn(`Snapshot error on ${key}:`, err);
-          updateSyncUI(false, "Local Mode (Offline)");
+          console.error(`Snapshot error on ${colName}:`, err);
+          updateSyncUI(false, "Sync Error");
         });
 
         unsubs.push(unsub);
       });
     }
 
-    // Database Writes (Firestore + Local Backup)
+    // Helper Write Operations
     window.dbSaveDoc = async function(colKey, id, data) {
-      const cleanCode = window.appState.shopCode.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '') || 'SHINE-2026';
-
-      // Update local memory immediately
-      const list = window.appState[colKey] || [];
-      const idx = list.findIndex(x => x.id === id);
-      if (idx >= 0) list[idx] = data;
-      else list.push(data);
-      localStorage.setItem(`local_${colKey}`, JSON.stringify(list));
-      window.renderAll();
-
-      if (currentUser && db) {
-        try {
-          const docRef = doc(db, 'shops', cleanCode, colKey, id);
-          await setDoc(docRef, { ...data, updatedAt: new Date().toISOString() }, { merge: true });
-        } catch (err) {
-          console.error("Cloud Save Error:", err);
-        }
+      if (!currentUser || !db) return;
+      const cleanCode = window.appState.shopCode.trim().replace(/[^a-zA-Z0-9_-]/g, '') || 'SHINE-2026';
+      const colName = `shop_${cleanCode}_${colKey}`;
+      try {
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', colName, id);
+        await setDoc(docRef, { ...data, updatedAt: new Date().toISOString() }, { merge: true });
+      } catch (err) {
+        console.error("Firestore Save Error:", err);
       }
     };
 
     window.dbDeleteDoc = async function(colKey, id) {
-      const cleanCode = window.appState.shopCode.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '') || 'SHINE-2026';
-
-      window.appState[colKey] = (window.appState[colKey] || []).filter(x => x.id !== id);
-      localStorage.setItem(`local_${colKey}`, JSON.stringify(window.appState[colKey]));
-      window.renderAll();
-
-      if (currentUser && db) {
-        try {
-          const docRef = doc(db, 'shops', cleanCode, colKey, id);
-          await deleteDoc(docRef);
-        } catch (err) {
-          console.error("Cloud Delete Error:", err);
-        }
+      if (!currentUser || !db) return;
+      const cleanCode = window.appState.shopCode.trim().replace(/[^a-zA-Z0-9_-]/g, '') || 'SHINE-2026';
+      const colName = `shop_${cleanCode}_${colKey}`;
+      try {
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', colName, id);
+        await deleteDoc(docRef);
+      } catch (err) {
+        console.error("Firestore Delete Error:", err);
       }
     };
 
@@ -960,7 +945,7 @@
       setupRealtimeSync();
     };
 
-    function seedDefaultPackages(shopCode) {
+    function seedDefaultPackages(colName) {
       const defaults = [
         { id: 'p1', name: 'Wash & Go (Exterior)', price: 80, desc: 'High pressure foam wash, wheel rinse & microfiber dry' },
         { id: 'p2', name: 'Full Valet (Sedan)', price: 150, desc: 'Wash, vacuum, dashboard polish & tire shine' },
@@ -968,16 +953,22 @@
         { id: 'p4', name: 'Engine Bay Clean', price: 120, desc: 'Degreaser spray, steam rinse & protective coat' },
         { id: 'p5', name: 'Dashboard & Interior Wipe', price: 40, desc: 'Silicone polish & dust removal' }
       ];
-      defaults.forEach(pkg => window.dbSaveDoc('packages', pkg.id, pkg));
+      defaults.forEach(pkg => {
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', colName, pkg.id);
+        setDoc(docRef, pkg);
+      });
     }
 
-    function seedDefaultSupplies(shopCode) {
+    function seedDefaultSupplies(colName) {
       const defaults = [
         { id: 's1', name: '25L Heavy Duty Shampoo Drum', stock: 4, low: 1 },
         { id: 's2', name: '5L Tire Gel & Polish', stock: 2, low: 1 },
         { id: 's3', name: 'Microfiber Drying Towels (Pack)', stock: 5, low: 2 }
       ];
-      defaults.forEach(sup => window.dbSaveDoc('supplies', sup.id, sup));
+      defaults.forEach(sup => {
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', colName, sup.id);
+        setDoc(docRef, sup);
+      });
     }
 
     function updateSyncUI(isSynced, text) {
@@ -991,6 +982,7 @@
       }
     }
 
+    // Launch Firebase on DOM Load
     window.addEventListener('DOMContentLoaded', initFirebase);
   </script>
 
@@ -1002,22 +994,12 @@
 
     window.addEventListener('DOMContentLoaded', () => {
       applySettingsUI();
-      // Ensure local package fallback if needed
-      if (!window.appState.packages || window.appState.packages.length === 0) {
-        window.appState.packages = [
-          { id: 'p1', name: 'Wash & Go (Exterior)', price: 80, desc: 'High pressure foam wash, wheel rinse & microfiber dry' },
-          { id: 'p2', name: 'Full Valet (Sedan)', price: 150, desc: 'Wash, vacuum, dashboard polish & tire shine' },
-          { id: 'p3', name: 'SUV / Bakkie Full Wash', price: 180, desc: 'Large vehicle wash, deep vacuum & tire dressing' },
-          { id: 'p4', name: 'Engine Bay Clean', price: 120, desc: 'Degreaser spray, steam rinse & protective coat' },
-          { id: 'p5', name: 'Dashboard & Interior Wipe', price: 40, desc: 'Silicone polish & dust removal' }
-        ];
-      }
       renderAll();
     });
 
     function money(val) {
       const n = Number(val) || 0;
-      return `${window.appState.currency}${n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      return `${window.appState.currency}${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
 
     function toast(msg, isErr = false) {
@@ -1056,8 +1038,8 @@
     function saveShopSettings(e) {
       e.preventDefault();
       const s = window.appState;
-      s.partnerName = document.getElementById('set-partner-name').value.trim() || 'Partner 1';
-      s.shopName = document.getElementById('set-shop-name').value.trim() || 'ShineBay Carwash';
+      s.partnerName = document.getElementById('set-partner-name').value.trim();
+      s.shopName = document.getElementById('set-shop-name').value.trim();
       s.phone = document.getElementById('set-phone').value.trim();
       s.address = document.getElementById('set-address').value.trim();
       s.currency = document.getElementById('set-currency').value;
