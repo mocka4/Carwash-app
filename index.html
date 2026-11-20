@@ -1,0 +1,1791 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ShineBay Carwash OS — Live Partner Command Center</title>
+
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            bay: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              700: '#0369a1',
+              900: '#0c4a6e'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Chart.js & Lucide Icons via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      overflow-x: hidden;
+    }
+
+    /* Thermal / A4 Print Styles for Wash Receipts */
+    @media print {
+      body * {
+        visibility: hidden !important;
+      }
+      #print-receipt-area, #print-receipt-area * {
+        visibility: visible !important;
+      }
+      #print-receipt-area {
+        position: fixed !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        max-width: 420px !important;
+        margin: 0 auto !important;
+        padding: 20px !important;
+        background: #ffffff !important;
+        color: #0f172a !important;
+        box-shadow: none !important;
+        border: none !important;
+        z-index: 99999 !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-slate-100 transition-colors duration-200 antialiased pb-24 lg:pb-0">
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Main App Shell -->
+  <div class="flex min-h-screen">
+
+    <!-- Desktop Sidebar -->
+    <aside id="sidebar" class="hidden lg:flex w-72 bg-slate-900 text-slate-200 flex-col justify-between border-r border-slate-800 shrink-0">
+      <div>
+        <!-- Brand Header -->
+        <div class="p-6 border-b border-slate-800 flex items-center gap-3.5">
+          <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-sky-500/30 shrink-0">
+            <i data-lucide="droplets" class="w-6 h-6"></i>
+          </div>
+          <div class="min-w-0">
+            <h1 id="sidebar-shop-name" class="font-extrabold text-white text-base leading-tight truncate">ShineBay Carwash</h1>
+            <p class="text-xs text-sky-400 font-medium truncate flex items-center gap-1.5 mt-0.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span id="sidebar-partner-label">Partner View</span>
+            </p>
+          </div>
+        </div>
+
+        <!-- Primary Action Button -->
+        <div class="p-4">
+          <button onclick="openWashModal()" class="w-full py-3.5 px-4 rounded-2xl bg-sky-500 hover:bg-sky-400 active:scale-[0.99] text-slate-950 font-extrabold text-sm shadow-lg shadow-sky-500/25 flex items-center justify-center gap-2 transition-all">
+            <i data-lucide="plus-circle" class="w-5 h-5"></i>
+            <span>RING UP A CAR</span>
+          </button>
+        </div>
+
+        <!-- Plain-English Navigation -->
+        <nav class="px-3 space-y-1.5">
+          <button onclick="switchTab('scoreboard')" data-tab="scoreboard" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold bg-slate-800 text-white transition-all">
+            <i data-lucide="gauge" class="w-5 h-5 text-sky-400"></i>
+            <span>Today's Scoreboard</span>
+          </button>
+          <button onclick="switchTab('tickets')" data-tab="tickets" class="nav-btn w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold text-slate-400 hover:text-white hover:bg-slate-800/60 transition-all">
+            <div class="flex items-center gap-3">
+              <i data-lucide="receipt" class="w-5 h-5"></i>
+              <span>Wash Tickets & Tabs</span>
+            </div>
+            <span id="badge-unpaid" class="hidden text-xs bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full font-bold">0</span>
+          </button>
+          <button onclick="switchTab('packages')" data-tab="packages" class="nav-btn w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold text-slate-400 hover:text-white hover:bg-slate-800/60 transition-all">
+            <div class="flex items-center gap-3">
+              <i data-lucide="tag" class="w-5 h-5"></i>
+              <span>Wash Price List</span>
+            </div>
+            <span id="badge-packages-count" class="text-xs bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full">0</span>
+          </button>
+          <button onclick="switchTab('customers')" data-tab="customers" class="nav-btn w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold text-slate-400 hover:text-white hover:bg-slate-800/60 transition-all">
+            <div class="flex items-center gap-3">
+              <i data-lucide="car" class="w-5 h-5"></i>
+              <span>Regulars & Fleets</span>
+            </div>
+            <span id="badge-customers" class="text-xs bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full">0</span>
+          </button>
+          <button onclick="switchTab('expenses')" data-tab="expenses" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-slate-400 hover:text-white hover:bg-slate-800/60 transition-all">
+            <i data-lucide="banknote" class="w-5 h-5"></i>
+            <span>Soap, Water & Wages</span>
+          </button>
+        </nav>
+      </div>
+
+      <!-- Sidebar Footer -->
+      <div class="p-4 border-t border-slate-800 space-y-2">
+        <button onclick="switchTab('settings')" data-tab="settings" class="nav-btn w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:text-white hover:bg-slate-800/60 transition-all">
+          <i data-lucide="users" class="w-4 h-4"></i>
+          <span>Partner Sync & Settings</span>
+        </button>
+        <div class="px-4 py-2 rounded-xl bg-slate-800/60 flex items-center justify-between text-xs text-slate-400">
+          <span class="flex items-center gap-1.5 font-medium"><i data-lucide="wifi" class="w-3.5 h-3.5 text-emerald-400"></i> Cloud Synced</span>
+          <span id="currency-badge" class="font-bold text-slate-200">R (ZAR)</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Workspace -->
+    <div class="flex-1 flex flex-col min-w-0">
+
+      <!-- Top Header -->
+      <header class="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 py-3.5 flex items-center justify-between sticky top-0 z-30">
+        <div class="flex items-center gap-3">
+          <div class="lg:hidden w-9 h-9 rounded-xl bg-sky-500 flex items-center justify-center text-slate-950 font-bold">
+            <i data-lucide="droplets" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 id="header-title" class="text-base sm:text-lg font-extrabold text-slate-900 dark:text-white leading-tight">Today's Scoreboard</h2>
+              <!-- Real-Time Sync Indicator -->
+              <span id="sync-status-badge" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span id="sync-status-text">Connecting...</span>
+              </span>
+            </div>
+            <p id="header-subtitle" class="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">Real-time business updates across both partners' phones</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 sm:gap-3">
+          <!-- Active Partner Pill -->
+          <div title="Change your partner name in settings" onclick="switchTab('settings')" class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700">
+            <i data-lucide="user-check" class="w-4 h-4 text-sky-500"></i>
+            <span id="header-partner-name">Partner 1</span>
+          </div>
+
+          <button onclick="openExpenseModal()" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all">
+            <i data-lucide="minus-circle" class="w-4 h-4 text-rose-500"></i>
+            <span>Log Expense</span>
+          </button>
+
+          <button onclick="openWashModal()" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs sm:text-sm font-extrabold shadow-sm transition-all">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            <span>Ring Up Car</span>
+          </button>
+
+          <button onclick="toggleDarkMode()" title="Switch Light/Dark Mode" class="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700">
+            <i data-lucide="moon" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- Main Viewport -->
+      <main class="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-6">
+
+        <!-- ==================== 1. TODAY'S SCOREBOARD ==================== -->
+        <section id="tab-scoreboard" class="tab-panel space-y-6">
+
+          <!-- Partner Code Banner -->
+          <div class="bg-gradient-to-r from-slate-900 via-sky-950 to-slate-900 text-white p-4 rounded-2xl border border-sky-800/40 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center shrink-0">
+                <i data-lucide="shield-check" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <div class="text-xs text-sky-300 font-bold uppercase tracking-wider">Live Shared Database Connected</div>
+                <div class="text-sm font-extrabold flex items-center gap-2 mt-0.5">
+                  <span>Shop Code: <code id="banner-shop-code" class="px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 font-mono text-xs">SHINE-2026</code></span>
+                </div>
+              </div>
+            </div>
+            <button onclick="copyShopCode()" class="px-3.5 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-extrabold flex items-center gap-1.5 shrink-0">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              <span>Copy Code for Partner</span>
+            </button>
+          </div>
+
+          <!-- 4 Big Financial KPI Cards -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            <!-- Cash & Card Collected -->
+            <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Cash & Card Revenue</span>
+                <span class="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                  <i data-lucide="wallet" class="w-5 h-5"></i>
+                </span>
+              </div>
+              <div id="kpi-collected" class="text-2xl sm:text-3xl font-extrabold text-emerald-600 dark:text-emerald-400">R0.00</div>
+              <p id="kpi-cars-count" class="text-xs text-slate-500 mt-1.5 font-medium">0 paid washes recorded</p>
+            </div>
+
+            <!-- Unpaid Fleet Tabs -->
+            <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Unpaid Fleet Tabs</span>
+                <span class="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                  <i data-lucide="clock" class="w-5 h-5"></i>
+                </span>
+              </div>
+              <div id="kpi-unpaid" class="text-2xl sm:text-3xl font-extrabold text-amber-600 dark:text-amber-400">R0.00</div>
+              <p id="kpi-unpaid-sub" class="text-xs text-slate-500 mt-1.5 font-medium">Money owed by fleets/clients</p>
+            </div>
+
+            <!-- Soap, Water & Wages -->
+            <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Soap, Water & Wages</span>
+                <span class="w-9 h-9 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center">
+                  <i data-lucide="trending-down" class="w-5 h-5"></i>
+                </span>
+              </div>
+              <div id="kpi-spent" class="text-2xl sm:text-3xl font-extrabold text-rose-600 dark:text-rose-400">R0.00</div>
+              <p class="text-xs text-slate-500 mt-1.5 font-medium">Total operating costs</p>
+            </div>
+
+            <!-- Profit In Your Pocket -->
+            <div class="bg-slate-900 dark:bg-sky-950/60 text-white p-5 rounded-2xl border border-slate-800 dark:border-sky-800/60 shadow-md">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-sky-300">Net Profit In Pocket</span>
+                <span class="w-9 h-9 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center">
+                  <i data-lucide="piggy-bank" class="w-5 h-5"></i>
+                </span>
+              </div>
+              <div id="kpi-profit" class="text-2xl sm:text-3xl font-extrabold text-white">R0.00</div>
+              <p class="text-xs text-sky-200/80 mt-1.5 font-medium">Revenue minus running costs</p>
+            </div>
+          </div>
+
+          <!-- Chart & Wash Bay Alerts -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Chart -->
+            <div class="lg:col-span-2 bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+              <div class="flex items-center justify-between mb-4">
+                <div>
+                  <h3 class="font-bold text-slate-900 dark:text-white">Monthly Revenue vs. Expenses</h3>
+                  <p class="text-xs text-slate-500">Live summary synced across both partner devices</p>
+                </div>
+              </div>
+              <div class="relative h-64 w-full">
+                <canvas id="washChart"></canvas>
+              </div>
+            </div>
+
+            <!-- Partner Activity & Alerts Box -->
+            <div class="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between space-y-4">
+              <div>
+                <h3 class="font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-3">
+                  <i data-lucide="bell" class="w-4 h-4 text-sky-500"></i>
+                  <span>Wash Bay Heads-Up</span>
+                </h3>
+                <div id="bay-alerts" class="space-y-2.5"></div>
+              </div>
+
+              <!-- Quick Tap Shortcuts -->
+              <div class="pt-3 border-t border-slate-200 dark:border-slate-800 grid grid-cols-2 gap-2.5">
+                <button onclick="switchTab('packages')" class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-sky-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-left transition-all">
+                  <div class="text-xs font-extrabold text-slate-900 dark:text-white">Edit Prices</div>
+                  <div class="text-[11px] text-slate-500">Update your packages</div>
+                </button>
+                <button onclick="openExpenseModal()" class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 text-left transition-all">
+                  <div class="text-xs font-extrabold text-slate-900 dark:text-white">+ Log Expense</div>
+                  <div class="text-[11px] text-slate-500">Chemicals, wages, water</div>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Live Feed of Washes & Partner Activity -->
+          <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div class="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <div>
+                <h3 class="font-bold text-slate-900 dark:text-white">Latest Washes Recorded</h3>
+                <p class="text-xs text-slate-500">See who logged each wash (Partner 1 / Partner 2)</p>
+              </div>
+              <button onclick="switchTab('tickets')" class="text-xs font-bold text-sky-600 dark:text-sky-400 hover:underline">View All Tickets →</button>
+            </div>
+            <div id="recent-washes-list" class="divide-y divide-slate-200 dark:divide-slate-800"></div>
+          </div>
+
+        </section>
+
+        <!-- ==================== 2. WASH TICKETS & FLEET TABS ==================== -->
+        <section id="tab-tickets" class="tab-panel hidden space-y-5">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+            <div class="flex flex-wrap items-center gap-2">
+              <button onclick="setTicketFilter('ALL')" data-tfilter="ALL" class="tfilter-btn px-3.5 py-2 rounded-xl text-xs font-bold bg-sky-500 text-slate-950">All Washes</button>
+              <button onclick="setTicketFilter('Paid')" data-tfilter="Paid" class="tfilter-btn px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">Paid (Cash/Card)</button>
+              <button onclick="setTicketFilter('Fleet Tab')" data-tfilter="Fleet Tab" class="tfilter-btn px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">Unpaid Fleet Tabs</button>
+            </div>
+            <button onclick="openWashModal()" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-extrabold">
+              <i data-lucide="plus" class="w-4 h-4"></i>
+              <span>Ring Up New Car</span>
+            </button>
+          </div>
+
+          <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="border-b border-slate-200 dark:border-slate-800 text-xs font-bold uppercase text-slate-500 bg-slate-50/70 dark:bg-slate-800/50">
+                    <th class="py-3.5 px-4">Ticket & Date</th>
+                    <th class="py-3.5 px-4">Customer & Vehicle</th>
+                    <th class="py-3.5 px-4">Wash Package</th>
+                    <th class="py-3.5 px-4">Logged By</th>
+                    <th class="py-3.5 px-4">Total</th>
+                    <th class="py-3.5 px-4">Payment</th>
+                    <th class="py-3.5 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="tickets-table-body" class="divide-y divide-slate-200 dark:divide-slate-800 text-sm"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== 3. WASH PRICE LIST (CUSTOM PACKAGES) ==================== -->
+        <section id="tab-packages" class="tab-panel hidden space-y-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+            <div>
+              <h3 class="font-bold text-slate-900 dark:text-white">Your Custom Wash Price List</h3>
+              <p class="text-xs text-slate-500">Add, edit, or change prices anytime—changes update live on your partner's phone</p>
+            </div>
+            <button onclick="openPackageModal()" class="px-4 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-extrabold flex items-center justify-center gap-1.5">
+              <i data-lucide="plus-circle" class="w-4 h-4"></i>
+              <span>+ Add Wash Package</span>
+            </button>
+          </div>
+
+          <!-- Packages Grid -->
+          <div id="packages-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+
+          <!-- Chemicals & Soap Stock Tracker Section -->
+          <div class="pt-6 border-t border-slate-200 dark:border-slate-800 space-y-4">
+            <div class="flex items-center justify-between bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+              <div>
+                <h3 class="font-bold text-slate-900 dark:text-white">Soap & Chemical Drums Stock</h3>
+                <p class="text-xs text-slate-500">Tap -1 when opening a new drum or bottle in the storeroom</p>
+              </div>
+              <button onclick="openSupplyModal()" class="px-3.5 py-2 rounded-xl bg-slate-900 dark:bg-slate-800 text-white text-xs font-extrabold">+ Add Supply Item</button>
+            </div>
+            <div id="supplies-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+          </div>
+        </section>
+
+        <!-- ==================== 4. REGULARS & FLEET ACCOUNTS ==================== -->
+        <section id="tab-customers" class="tab-panel hidden space-y-5">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+            <div class="relative flex-1 max-w-md">
+              <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+              <input id="cust-search" oninput="renderCustomers()" type="text" placeholder="Search customer, number plate, vehicle..." class="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500" />
+            </div>
+            <button onclick="openCustomerModal()" class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-extrabold">
+              <i data-lucide="user-plus" class="w-4 h-4"></i>
+              <span>Add Regular / Fleet</span>
+            </button>
+          </div>
+
+          <div id="customers-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+        </section>
+
+        <!-- ==================== 5. EXPENSES (SOAP, WATER & WAGES) ==================== -->
+        <section id="tab-expenses" class="tab-panel hidden space-y-5">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+            <div>
+              <h3 class="font-bold text-slate-900 dark:text-white">Soap, Water, Wages & Operating Expenses</h3>
+              <p class="text-xs text-slate-500">Every cost recorded here is subtracted live from revenue on both partners' screens</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="exportExpensesCSV()" class="px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold">Export Excel CSV</button>
+              <button onclick="openExpenseModal()" class="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-extrabold">+ Log Expense</button>
+            </div>
+          </div>
+
+          <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="border-b border-slate-200 dark:border-slate-800 text-xs font-bold uppercase text-slate-500 bg-slate-50/70 dark:bg-slate-800/50">
+                    <th class="py-3.5 px-4">Date</th>
+                    <th class="py-3.5 px-4">Expense Description</th>
+                    <th class="py-3.5 px-4">Category</th>
+                    <th class="py-3.5 px-4">Logged By</th>
+                    <th class="py-3.5 px-4">Amount</th>
+                    <th class="py-3.5 px-4 text-right">Delete</th>
+                  </tr>
+                </thead>
+                <tbody id="expenses-table-body" class="divide-y divide-slate-200 dark:divide-slate-800 text-sm"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== 6. PARTNER SYNC & SHOP SETTINGS ==================== -->
+        <section id="tab-settings" class="tab-panel hidden max-w-3xl space-y-6">
+          
+          <!-- Shared Shop Code & Real-Time Sync Setup -->
+          <div class="bg-gradient-to-br from-slate-900 to-sky-950 text-white p-6 rounded-2xl border border-sky-800/60 shadow-lg space-y-5">
+            <div class="flex items-start justify-between">
+              <div>
+                <span class="px-2.5 py-1 rounded-md bg-sky-500/20 text-sky-300 text-xs font-extrabold uppercase">Real-Time Partner Pairing</span>
+                <h3 class="text-lg font-extrabold text-white mt-1">Shared Shop Code Database</h3>
+                <p class="text-xs text-sky-200/80 mt-1">Enter the exact same Shop Code on both phones to share live data instantly.</p>
+              </div>
+              <div class="w-10 h-10 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center shrink-0">
+                <i data-lucide="wifi" class="w-6 h-6"></i>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+              <div class="sm:col-span-2">
+                <label class="block text-xs font-bold text-sky-300 mb-1">Current Shared Shop Code</label>
+                <div class="flex items-center gap-2">
+                  <input id="sync-shop-code-input" type="text" value="SHINE-2026" class="flex-1 px-4 py-2.5 rounded-xl bg-slate-950 border border-sky-700/60 font-mono text-base font-extrabold tracking-wider text-sky-300 uppercase focus:outline-none focus:ring-2 focus:ring-sky-400" />
+                  <button onclick="joinShopCodeFromInput()" class="px-4 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-extrabold text-xs shrink-0">Join Shop</button>
+                </div>
+              </div>
+              <div class="flex flex-col justify-end gap-2">
+                <button onclick="copyShopCode()" class="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-sky-300 border border-slate-700 flex items-center justify-center gap-1.5">
+                  <i data-lucide="copy" class="w-4 h-4"></i>
+                  <span>Copy Code</span>
+                </button>
+                <button onclick="generatePrivateShopCode()" class="w-full py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300 border border-slate-700 flex items-center justify-center gap-1.5">
+                  <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                  <span>Create Private Code</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Partner Name & Shop Setup -->
+          <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+            <div>
+              <h3 class="text-base font-extrabold text-slate-900 dark:text-white">Your Name & Carwash Details</h3>
+              <p class="text-xs text-slate-500">Set who you are so tickets show your name to your partner</p>
+            </div>
+
+            <form onsubmit="saveShopSettings(event)" class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+              <div>
+                <label class="block text-xs font-bold text-slate-500 mb-1">Your Name / Partner Identifier *</label>
+                <input id="set-partner-name" type="text" required placeholder="e.g. Partner 1 (Sbu) or Partner 2 (Tumi)" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-bold" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-500 mb-1">Carwash Business Name</label>
+                <input id="set-shop-name" type="text" required class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-500 mb-1">Phone / WhatsApp Number</label>
+                <input id="set-phone" type="text" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-500 mb-1">Currency Symbol</label>
+                <select id="set-currency" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                  <option value="R">R — South African Rand</option>
+                  <option value="$">$ — US / Namibian Dollar</option>
+                  <option value="P">P — Botswana Pula</option>
+                  <option value="£">£ — British Pound</option>
+                  <option value="€">€ — Euro</option>
+                </select>
+              </div>
+              <div class="sm:col-span-2">
+                <label class="block text-xs font-bold text-slate-500 mb-1">Street Address / Bay Location</label>
+                <input id="set-address" type="text" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" />
+              </div>
+              <div class="sm:col-span-2 pt-2">
+                <button type="submit" class="px-5 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-extrabold text-sm">Save Details</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Offline & Safety Backup -->
+          <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+            <div>
+              <h3 class="text-base font-extrabold text-slate-900 dark:text-white">Backup & Reset Tools</h3>
+              <p class="text-xs text-slate-500">Download a copy of your tickets or wipe demo items when starting fresh</p>
+            </div>
+            <div class="flex flex-wrap gap-3">
+              <button onclick="downloadBackup()" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 dark:bg-slate-800 text-white text-xs font-bold">
+                <i data-lucide="download" class="w-4 h-4"></i>
+                <span>Download JSON Backup</span>
+              </button>
+              <button onclick="resetShopData()" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 text-xs font-bold">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                <span>Clear All Shop Data (Start Day 1)</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- Mobile Bottom Navigation Bar (Optimized for Touch at Wash Bay) -->
+  <nav class="lg:hidden fixed bottom-0 inset-x-0 bg-slate-900 border-t border-slate-800 px-2 py-1.5 flex items-center justify-around z-40">
+    <button onclick="switchTab('scoreboard')" data-tab="scoreboard" class="mob-nav flex flex-col items-center p-1.5 text-sky-400 text-[10px] font-bold">
+      <i data-lucide="gauge" class="w-5 h-5 mb-0.5"></i>
+      <span>Scoreboard</span>
+    </button>
+    <button onclick="switchTab('tickets')" data-tab="tickets" class="mob-nav flex flex-col items-center p-1.5 text-slate-400 text-[10px] font-bold">
+      <i data-lucide="receipt" class="w-5 h-5 mb-0.5"></i>
+      <span>Tickets</span>
+    </button>
+    <button onclick="openWashModal()" class="flex flex-col items-center -mt-5">
+      <span class="w-12 h-12 rounded-full bg-sky-500 text-slate-950 flex items-center justify-center shadow-lg shadow-sky-500/40">
+        <i data-lucide="plus" class="w-6 h-6"></i>
+      </span>
+      <span class="text-[10px] font-extrabold text-sky-400 mt-1">Ring Up</span>
+    </button>
+    <button onclick="switchTab('packages')" data-tab="packages" class="mob-nav flex flex-col items-center p-1.5 text-slate-400 text-[10px] font-bold">
+      <i data-lucide="tag" class="w-5 h-5 mb-0.5"></i>
+      <span>Price List</span>
+    </button>
+    <button onclick="switchTab('customers')" data-tab="customers" class="mob-nav flex flex-col items-center p-1.5 text-slate-400 text-[10px] font-bold">
+      <i data-lucide="car" class="w-5 h-5 mb-0.5"></i>
+      <span>Fleets</span>
+    </button>
+  </nav>
+
+  <!-- ==================== MODALS ==================== -->
+
+  <!-- 1. RING UP A CAR MODAL (Touch POS) -->
+  <div id="modal-wash" class="fixed inset-0 z-50 hidden bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+    <div class="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden my-4">
+      <div class="p-5 bg-slate-900 text-white flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-xl bg-sky-500 text-slate-950 flex items-center justify-center font-bold">
+            <i data-lucide="car-front" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-base">Ring Up a Car</h3>
+            <p class="text-[11px] text-slate-400">Tap packages below to add them to this ticket</p>
+          </div>
+        </div>
+        <button onclick="closeModal('modal-wash')" class="p-1.5 rounded-xl text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+
+      <form onsubmit="saveWashTicket(event)" class="p-5 space-y-5 text-sm max-h-[82vh] overflow-y-auto">
+        <!-- Step 1: Customer & Car -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-500 mb-1">Customer / Fleet Account</label>
+            <select id="wash-cust-select" onchange="onSelectWashCustomer()" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-semibold">
+              <option value="WALKIN">Walk-in Cash Customer</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-500 mb-1">Number Plate (Required)</label>
+            <input id="wash-plate" type="text" required placeholder="e.g. KZN 123 GP" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 uppercase font-bold text-slate-900 dark:text-white" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-500 mb-1">Car Model / Color</label>
+            <input id="wash-car" type="text" placeholder="e.g. White Hilux Bakkie" class="w-full px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" />
+          </div>
+        </div>
+
+        <!-- Step 2: Custom Packages Menu Buttons -->
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Tap Your Wash Packages to Add</label>
+          <div id="wash-quick-buttons" class="grid grid-cols-2 sm:grid-cols-3 gap-2.5"></div>
+        </div>
+
+        <!-- Selected Items Cart -->
+        <div class="bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2">
+          <div class="flex items-center justify-between text-xs font-bold text-slate-500">
+            <span>Selected Services</span>
+            <button type="button" onclick="clearWashSelection()" class="text-rose-500 hover:underline">Clear Selection</button>
+          </div>
+          <div id="wash-selected-items" class="space-y-1.5 text-xs">
+            <div class="text-slate-400 py-2 text-center">Tap a package button above to start...</div>
+          </div>
+          <div class="pt-2 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
+            <span class="font-bold text-slate-600 dark:text-slate-300">Total Wash Price:</span>
+            <span id="wash-total-display" class="text-xl font-extrabold text-slate-900 dark:text-white">R0.00</span>
+          </div>
+        </div>
+
+        <!-- Step 3: Payment Status -->
+        <div class="grid grid-cols-2 gap-3">
+          <label class="cursor-pointer">
+            <input type="radio" name="wash-payment" value="Paid" checked class="peer hidden" />
+            <div class="p-3.5 rounded-2xl border-2 border-slate-200 dark:border-slate-700 peer-checked:border-emerald-500 peer-checked:bg-emerald-500/10 text-center transition-all">
+              <div class="font-extrabold text-sm text-emerald-600 dark:text-emerald-400">Paid Now</div>
+              <div class="text-[11px] text-slate-500">Cash, Card, or EFT</div>
+            </div>
+          </label>
+          <label class="cursor-pointer">
+            <input type="radio" name="wash-payment" value="Fleet Tab" class="peer hidden" />
+            <div class="p-3.5 rounded-2xl border-2 border-slate-200 dark:border-slate-700 peer-checked:border-amber-500 peer-checked:bg-amber-500/10 text-center transition-all">
+              <div class="font-extrabold text-sm text-amber-600 dark:text-amber-400">Fleet Tab (Unpaid)</div>
+              <div class="text-[11px] text-slate-500">Add to client tab</div>
+            </div>
+          </label>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeModal('modal-wash')" class="px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 font-bold">Cancel</button>
+          <button type="submit" class="px-6 py-3 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-extrabold shadow-md">Complete Wash Ticket</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 2. ADD / EDIT WASH PACKAGE MODAL -->
+  <div id="modal-package" class="fixed inset-0 z-50 hidden bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden">
+      <div class="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+        <h3 id="modal-pkg-title" class="font-extrabold text-slate-900 dark:text-white">Add Wash Package</h3>
+        <button onclick="closeModal('modal-package')" class="p-1.5 rounded-lg text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <form onsubmit="savePackageForm(event)" class="p-5 space-y-4 text-sm">
+        <input type="hidden" id="pkg-edit-id" value="" />
+        <div>
+          <label class="block text-xs font-bold text-slate-500 mb-1">Package / Service Name *</label>
+          <input id="pkg-name" required type="text" placeholder="e.g. Wash & Go (Sedan)" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" />
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-500 mb-1">Price (R) *</label>
+          <input id="pkg-price" required type="number" min="0" step="1" placeholder="120" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-bold" />
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-500 mb-1">Short Description</label>
+          <input id="pkg-desc" type="text" placeholder="e.g. Exterior high-pressure wash, foam soap, drying" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" />
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeModal('modal-package')" class="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 font-bold">Cancel</button>
+          <button type="submit" class="px-5 py-2.5 rounded-xl bg-sky-500 text-slate-950 font-extrabold">Save Package</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 3. ADD / EDIT CUSTOMER MODAL -->
+  <div id="modal-customer" class="fixed inset-0 z-50 hidden bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden">
+      <div class="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+        <h3 class="font-extrabold text-slate-900 dark:text-white">Add Regular / Fleet Client</h3>
+        <button onclick="closeModal('modal-customer')" class="p-1.5 rounded-lg text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <form onsubmit="saveCustomerForm(event)" class="p-5 space-y-4 text-sm">
+        <div>
+          <label class="block text-xs font-bold text-slate-500 mb-1">Customer Name / Company *</label>
+          <input id="cust-name" required type="text" placeholder="e.g. Sipho Ndlovu or Taxi Fleet 4" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-500 mb-1">Client Type</label>
+            <select id="cust-type" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+              <option value="VIP Regular">VIP Regular</option>
+              <option value="Fleet Account">Fleet Account</option>
+              <option value="Taxi / e-Hailing">Taxi / Bolt Driver</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-500 mb-1">WhatsApp / Phone</label>
+            <input id="cust-phone" type="text" placeholder="072 123 4567" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" />
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-500 mb-1">Number Plate</label>
+            <input id="cust-plate" type="text" placeholder="KZN 889 GP" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 uppercase font-bold" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-500 mb-1">Vehicle Details</label>
+            <input id="cust-car" type="text" placeholder="Silver Toyota Corolla" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" />
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeModal('modal-customer')" class="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 font-bold">Cancel</button>
+          <button type="submit" class="px-5 py-2.5 rounded-xl bg-sky-500 text-slate-950 font-extrabold">Save Client</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 4. LOG EXPENSE MODAL -->
+  <div id="modal-expense" class="fixed inset-0 z-50 hidden bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden">
+      <div class="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+        <h3 class="font-extrabold text-slate-900 dark:text-white">Log Carwash Expense</h3>
+        <button onclick="closeModal('modal-expense')" class="p-1.5 rounded-lg text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <form onsubmit="saveExpenseForm(event)" class="p-5 space-y-4 text-sm">
+        <div>
+          <label class="block text-xs font-bold text-slate-500 mb-1">Description *</label>
+          <input id="exp-desc" required type="text" placeholder="e.g. 25L Shampoo Drum or Wash Crew Wages" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-500 mb-1">Category</label>
+            <select id="exp-cat" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+              <option value="Chemicals & Soap">Chemicals & Soap</option>
+              <option value="Staff Wages & Tips">Staff Wages & Tips</option>
+              <option value="Water & Electricity">Water & Electricity</option>
+              <option value="Equipment & Cloths">Equipment & Cloths</option>
+              <option value="Rent & Other">Rent & Other</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-500 mb-1">Amount Spent (R) *</label>
+            <input id="exp-amount" required type="number" min="1" step="0.01" placeholder="250" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-bold" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-500 mb-1">Date</label>
+          <input id="exp-date" type="date" required class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" />
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeModal('modal-expense')" class="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 font-bold">Cancel</button>
+          <button type="submit" class="px-5 py-2.5 rounded-xl bg-rose-600 text-white font-extrabold">Save Expense</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 5. ADD SUPPLY DRUM MODAL -->
+  <div id="modal-supply" class="fixed inset-0 z-50 hidden bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden">
+      <div class="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+        <h3 class="font-extrabold text-slate-900 dark:text-white">Add Soap / Supply Item</h3>
+        <button onclick="closeModal('modal-supply')" class="p-1.5 rounded-lg text-slate-400"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <form onsubmit="saveSupplyForm(event)" class="p-5 space-y-4 text-sm">
+        <div>
+          <label class="block text-xs font-bold text-slate-500 mb-1">Supply Name *</label>
+          <input id="sup-name" required type="text" placeholder="e.g. 25L Foam Shampoo Drum" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-500 mb-1">Current Units Left</label>
+            <input id="sup-stock" type="number" min="0" value="3" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-bold" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-500 mb-1">Low Warning Limit</label>
+            <input id="sup-low" type="number" min="0" value="1" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-bold" />
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="closeModal('modal-supply')" class="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 font-bold">Cancel</button>
+          <button type="submit" class="px-5 py-2.5 rounded-xl bg-sky-500 text-slate-950 font-extrabold">Save Supply</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 6. PRINT RECEIPT MODAL -->
+  <div id="modal-receipt" class="fixed inset-0 z-50 hidden bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden text-slate-900">
+      <div class="no-print bg-slate-900 text-white px-5 py-3 flex items-center justify-between">
+        <span class="text-xs font-bold">Wash Receipt Preview</span>
+        <div class="flex items-center gap-2">
+          <button onclick="window.print()" class="px-3.5 py-1.5 rounded-lg bg-sky-500 text-slate-950 text-xs font-extrabold">Print / PDF</button>
+          <button onclick="closeModal('modal-receipt')" class="p-1 text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+      </div>
+      <div id="print-receipt-area" class="p-6 bg-white text-slate-900 space-y-4 text-sm"></div>
+    </div>
+  </div>
+
+
+  <!-- ==================== FIREBASE REAL-TIME ENGINE ==================== -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, deleteDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // HARDCODED USER FIREBASE CREDENTIALS
+    const firebaseConfig = {
+      apiKey: "AIzaSyAjovLkyOhQgRNaHrtFYlNrzJAeFfAheqQ",
+      authDomain: "carwash-business-4b3e1.firebaseapp.com",
+      projectId: "carwash-business-4b3e1",
+      storageBucket: "carwash-business-4b3e1.firebasestorage.app",
+      messagingSenderId: "171062055560",
+      appId: "1:171062055560:web:173b19ad08c81a035d453d"
+    };
+
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'carwash-business-4b3e1';
+
+    let firebaseApp, auth, db;
+    let currentUser = null;
+    let unsubs = [];
+
+    // Local State
+    window.appState = {
+      shopCode: localStorage.getItem('shinebay_shop_code') || 'SHINE-2026',
+      partnerName: localStorage.getItem('shinebay_partner_name') || 'Partner 1',
+      shopName: localStorage.getItem('shinebay_shop_name') || 'ShineBay Carwash',
+      phone: localStorage.getItem('shinebay_phone') || '072 845 9910',
+      address: localStorage.getItem('shinebay_address') || 'Main Road Wash Bay',
+      currency: localStorage.getItem('shinebay_currency') || 'R',
+      darkMode: localStorage.getItem('shinebay_dark') === 'true',
+      tickets: [],
+      expenses: [],
+      customers: [],
+      packages: [],
+      supplies: []
+    };
+
+    // Firebase Auth & Snapshot Sync Setup
+    async function initFirebase() {
+      try {
+        firebaseApp = initializeApp(firebaseConfig);
+        auth = getAuth(firebaseApp);
+        db = getFirestore(firebaseApp);
+
+        // Auth Before Queries
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+
+        onAuthStateChanged(auth, (user) => {
+          if (user) {
+            currentUser = user;
+            setupRealtimeSync();
+          } else {
+            currentUser = null;
+            updateSyncUI(false, "Offline Mode");
+          }
+        });
+      } catch (err) {
+        console.warn("Firestore initialization fallback:", err);
+        updateSyncUI(false, "Local Offline Mode");
+      }
+    }
+
+    function setupRealtimeSync() {
+      if (!currentUser || !db) return;
+
+      // Clean old listeners
+      unsubs.forEach(unsub => unsub());
+      unsubs = [];
+
+      const cleanCode = window.appState.shopCode.trim().replace(/[^a-zA-Z0-9_-]/g, '') || 'SHINE-2026';
+      updateSyncUI(true, `Synced Live: ${cleanCode}`);
+
+      // Strict Paths: /artifacts/{appId}/public/data/{collectionName}
+      const collectionsMap = {
+        tickets: `shop_${cleanCode}_tickets`,
+        expenses: `shop_${cleanCode}_expenses`,
+        customers: `shop_${cleanCode}_customers`,
+        packages: `shop_${cleanCode}_packages`,
+        supplies: `shop_${cleanCode}_supplies`
+      };
+
+      Object.entries(collectionsMap).forEach(([key, colName]) => {
+        const colRef = collection(db, 'artifacts', appId, 'public', 'data', colName);
+        
+        // Simple collection query with error callback
+        const unsub = onSnapshot(colRef, (snapshot) => {
+          const list = [];
+          snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
+          
+          window.appState[key] = list;
+
+          // If new shop code has 0 packages, seed defaults automatically!
+          if (key === 'packages' && list.length === 0) {
+            seedDefaultPackages(colName);
+          }
+          if (key === 'supplies' && list.length === 0) {
+            seedDefaultSupplies(colName);
+          }
+
+          window.renderAll();
+        }, (err) => {
+          console.error(`Snapshot error on ${colName}:`, err);
+          updateSyncUI(false, "Firebase Rules/Auth Needed");
+        });
+
+        unsubs.push(unsub);
+      });
+    }
+
+    // Helper Write Operations
+    window.dbSaveDoc = async function(colKey, id, data) {
+      if (!currentUser || !db) return;
+      const cleanCode = window.appState.shopCode.trim().replace(/[^a-zA-Z0-9_-]/g, '') || 'SHINE-2026';
+      const colName = `shop_${cleanCode}_${colKey}`;
+      try {
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', colName, id);
+        await setDoc(docRef, { ...data, updatedAt: new Date().toISOString() }, { merge: true });
+      } catch (err) {
+        console.error("Firestore Save Error:", err);
+      }
+    };
+
+    window.dbDeleteDoc = async function(colKey, id) {
+      if (!currentUser || !db) return;
+      const cleanCode = window.appState.shopCode.trim().replace(/[^a-zA-Z0-9_-]/g, '') || 'SHINE-2026';
+      const colName = `shop_${cleanCode}_${colKey}`;
+      try {
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', colName, id);
+        await deleteDoc(docRef);
+      } catch (err) {
+        console.error("Firestore Delete Error:", err);
+      }
+    };
+
+    window.switchShopCode = function(newCode) {
+      window.appState.shopCode = newCode.toUpperCase();
+      localStorage.setItem('shinebay_shop_code', window.appState.shopCode);
+      setupRealtimeSync();
+    };
+
+    function seedDefaultPackages(colName) {
+      const defaults = [
+        { id: 'p1', name: 'Wash & Go (Exterior)', price: 70, desc: 'High pressure foam wash, wheel rinse & microfiber dry' },
+        { id: 'p2', name: 'Full Wash & Go (Sedan)', price: 110, desc: 'Wash, vacuum, dashboard polish & tire shine' },
+        { id: 'p3', name: 'SUV / Bakkie Full Wash', price: 150, desc: 'Large vehicle wash, deep vacuum & tire dressing' },
+        { id: 'p4', name: 'Executive Full Valet', price: 450, desc: 'Complete interior seat shampoo, deep polish & exterior wax' },
+        { id: 'p5', name: 'Engine Steam Clean', price: 120, desc: 'Degreaser spray, steam rinse & protective coat' }
+      ];
+      defaults.forEach(pkg => {
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', colName, pkg.id);
+        setDoc(docRef, pkg);
+      });
+    }
+
+    function seedDefaultSupplies(colName) {
+      const defaults = [
+        { id: 's1', name: '25L Heavy Duty Shampoo Drum', stock: 4, low: 1 },
+        { id: 's2', name: '5L Tire Gel & Polish', stock: 2, low: 1 },
+        { id: 's3', name: 'Microfiber Drying Towels (Pack)', stock: 5, low: 2 }
+      ];
+      defaults.forEach(sup => {
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', colName, sup.id);
+        setDoc(docRef, sup);
+      });
+    }
+
+    function updateSyncUI(isSynced, text) {
+      const badge = document.getElementById('sync-status-badge');
+      const txt = document.getElementById('sync-status-text');
+      if (badge && txt) {
+        txt.textContent = text;
+        badge.className = isSynced
+          ? "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+          : "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20";
+      }
+    }
+
+    // Launch Firebase on DOM Load
+    window.addEventListener('DOMContentLoaded', initFirebase);
+  </script>
+
+  <!-- ==================== MAIN UI APP ENGINE ==================== -->
+  <script>
+    let currentWashCart = [];
+    let currentTicketFilter = 'ALL';
+    let chartInstance = null;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      applySettingsUI();
+      renderAll();
+    });
+
+    function money(val) {
+      const n = Number(val) || 0;
+      return `${window.appState.currency}${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+
+    function toast(msg, isErr = false) {
+      const box = document.getElementById('toast-container');
+      const el = document.createElement('div');
+      el.className = `pointer-events-auto px-4 py-3 rounded-2xl shadow-xl text-xs font-bold flex items-center gap-2 transition-all duration-300 ${isErr ? 'bg-rose-600 text-white' : 'bg-slate-900 text-white border border-slate-700'}`;
+      el.innerHTML = `<span class="w-2 h-2 rounded-full ${isErr ? 'bg-white' : 'bg-sky-400'}"></span><span>${msg}</span>`;
+      box.appendChild(el);
+      setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 2800);
+    }
+
+    function applySettingsUI() {
+      const s = window.appState;
+      document.documentElement.classList.toggle('dark', !!s.darkMode);
+      document.getElementById('sidebar-shop-name').textContent = s.shopName;
+      document.getElementById('sidebar-partner-label').textContent = s.partnerName;
+      document.getElementById('header-partner-name').textContent = s.partnerName;
+      document.getElementById('currency-badge').textContent = `${s.currency} Currency`;
+      document.getElementById('banner-shop-code').textContent = s.shopCode;
+      document.getElementById('sync-shop-code-input').value = s.shopCode;
+
+      document.getElementById('set-partner-name').value = s.partnerName;
+      document.getElementById('set-shop-name').value = s.shopName;
+      document.getElementById('set-phone').value = s.phone;
+      document.getElementById('set-address').value = s.address;
+      document.getElementById('set-currency').value = s.currency;
+    }
+
+    function toggleDarkMode() {
+      window.appState.darkMode = !window.appState.darkMode;
+      localStorage.setItem('shinebay_dark', window.appState.darkMode);
+      applySettingsUI();
+      renderChart();
+    }
+
+    function saveShopSettings(e) {
+      e.preventDefault();
+      const s = window.appState;
+      s.partnerName = document.getElementById('set-partner-name').value.trim();
+      s.shopName = document.getElementById('set-shop-name').value.trim();
+      s.phone = document.getElementById('set-phone').value.trim();
+      s.address = document.getElementById('set-address').value.trim();
+      s.currency = document.getElementById('set-currency').value;
+
+      localStorage.setItem('shinebay_partner_name', s.partnerName);
+      localStorage.setItem('shinebay_shop_name', s.shopName);
+      localStorage.setItem('shinebay_phone', s.phone);
+      localStorage.setItem('shinebay_address', s.address);
+      localStorage.setItem('shinebay_currency', s.currency);
+
+      applySettingsUI();
+      renderAll();
+      toast('Settings updated successfully!');
+    }
+
+    function copyShopCode() {
+      const code = window.appState.shopCode;
+      const dummy = document.createElement('input');
+      document.body.appendChild(dummy);
+      dummy.value = code;
+      dummy.select();
+      document.execCommand('copy');
+      document.body.removeChild(dummy);
+      toast(`Copied Shop Code: ${code}`);
+    }
+
+    function joinShopCodeFromInput() {
+      const code = document.getElementById('sync-shop-code-input').value.trim().toUpperCase();
+      if (!code) return;
+      if (window.switchShopCode) {
+        window.switchShopCode(code);
+        applySettingsUI();
+        toast(`Connected to Shared Shop: ${code}`);
+      }
+    }
+
+    function generatePrivateShopCode() {
+      const randomCode = 'WASH-' + Math.floor(1000 + Math.random() * 9000);
+      document.getElementById('sync-shop-code-input').value = randomCode;
+      joinShopCodeFromInput();
+    }
+
+    const TITLES = {
+      scoreboard: ["Today's Scoreboard", "Real-time summary synced live across both partner phones"],
+      tickets: ["Wash Tickets & Fleet Tabs", "Every car washed—tap 'Mark Paid' when a fleet settles up"],
+      packages: ["Custom Wash Price List", "Add, edit or change your service prices anytime"],
+      customers: ["Regulars & Fleet Accounts", "VIP drivers, taxis, and monthly company fleet accounts"],
+      expenses: ["Soap, Water & Wages", "Log running expenses—subtracted live from revenue"],
+      settings: ["Partner Sync & Settings", "Set your partner name, join shared shop code, or backup"]
+    };
+
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+      document.getElementById(`tab-${tab}`).classList.remove('hidden');
+
+      document.querySelectorAll('.nav-btn').forEach(b => {
+        if (b.dataset.tab === tab) {
+          b.className = 'nav-btn w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold bg-slate-800 text-white transition-all';
+        } else {
+          b.className = 'nav-btn w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold text-slate-400 hover:text-white hover:bg-slate-800/60 transition-all';
+        }
+      });
+
+      document.querySelectorAll('.mob-nav').forEach(b => {
+        b.classList.toggle('text-sky-400', b.dataset.tab === tab);
+        b.classList.toggle('text-slate-400', b.dataset.tab !== tab);
+      });
+
+      document.getElementById('header-title').textContent = TITLES[tab][0];
+      document.getElementById('header-subtitle').textContent = TITLES[tab][1];
+      if (tab === 'scoreboard') renderChart();
+      lucide.createIcons();
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    function renderAll() {
+      renderScoreboard();
+      renderTickets();
+      renderPackages();
+      renderSupplies();
+      renderCustomers();
+      renderExpenses();
+      updateBadges();
+      lucide.createIcons();
+    }
+
+    function updateBadges() {
+      const tickets = window.appState.tickets || [];
+      const unpaid = tickets.filter(t => t.status === 'Fleet Tab').length;
+      const bUnpaid = document.getElementById('badge-unpaid');
+      bUnpaid.textContent = unpaid;
+      bUnpaid.classList.toggle('hidden', unpaid === 0);
+
+      document.getElementById('badge-packages-count').textContent = (window.appState.packages || []).length;
+      document.getElementById('badge-customers').textContent = (window.appState.customers || []).length;
+    }
+
+    // ==================== 1. SCOREBOARD ====================
+    function renderScoreboard() {
+      const tickets = window.appState.tickets || [];
+      const expenses = window.appState.expenses || [];
+
+      const paidTickets = tickets.filter(t => t.status === 'Paid');
+      const unpaidTickets = tickets.filter(t => t.status === 'Fleet Tab');
+
+      const collected = paidTickets.reduce((s, t) => s + (t.total || 0), 0);
+      const unpaidSum = unpaidTickets.reduce((s, t) => s + (t.total || 0), 0);
+      const spent = expenses.reduce((s, e) => s + (e.amount || 0), 0);
+      const profit = collected - spent;
+
+      document.getElementById('kpi-collected').textContent = money(collected);
+      document.getElementById('kpi-cars-count').textContent = `${paidTickets.length} paid wash${paidTickets.length === 1 ? '' : 'es'} completed`;
+      document.getElementById('kpi-unpaid').textContent = money(unpaidSum);
+      document.getElementById('kpi-unpaid-sub').textContent = `${unpaidTickets.length} fleet tab${unpaidTickets.length === 1 ? '' : 's'} waiting to settle`;
+      document.getElementById('kpi-spent').textContent = money(spent);
+      document.getElementById('kpi-profit').textContent = money(profit);
+
+      // Bay Alerts
+      const alerts = [];
+      const supplies = window.appState.supplies || [];
+      const lowSupplies = supplies.filter(s => (s.stock || 0) <= (s.low || 1));
+      if (lowSupplies.length) {
+        alerts.push({
+          color: 'rose',
+          icon: 'alert-triangle',
+          title: `Low Stock: ${lowSupplies[0].name}`,
+          text: `Only ${lowSupplies[0].stock} left in storeroom!`
+        });
+      }
+      if (unpaidTickets.length) {
+        alerts.push({
+          color: 'amber',
+          icon: 'clock',
+          title: `${unpaidTickets.length} Unpaid Fleet Tab(s) — ${money(unpaidSum)}`,
+          text: `Tap 'Tickets' tab to mark paid when received.`
+        });
+      }
+      if (!alerts.length) {
+        alerts.push({
+          color: 'emerald',
+          icon: 'check-circle-2',
+          title: 'Wash Bay Operating Smoothly',
+          text: 'Soap stock is healthy and database is synced live.'
+        });
+      }
+
+      document.getElementById('bay-alerts').innerHTML = alerts.map(a => `
+        <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-start gap-2.5">
+          <i data-lucide="${a.icon}" class="w-4 h-4 text-${a.color}-500 shrink-0 mt-0.5"></i>
+          <div>
+            <div class="text-xs font-bold text-slate-900 dark:text-white">${a.title}</div>
+            <div class="text-[11px] text-slate-500 mt-0.5">${a.text}</div>
+          </div>
+        </div>
+      `).join('');
+
+      // Recent Washes Feed
+      const recentEl = document.getElementById('recent-washes-list');
+      const sorted = [...tickets].sort((a,b) => (b.number || '').localeCompare(a.number || ''));
+      const latest = sorted.slice(0, 5);
+      if (!latest.length) {
+        recentEl.innerHTML = `<div class="p-8 text-center text-xs text-slate-400">No cars logged yet. Tap "Ring Up Car" to log your first wash!</div>`;
+      } else {
+        recentEl.innerHTML = latest.map(t => `
+          <div class="p-4 flex flex-wrap items-center justify-between gap-3 hover:bg-slate-50 dark:hover:bg-slate-800/40">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center font-extrabold text-xs">
+                ${t.plate ? t.plate.slice(0, 4) : 'WASH'}
+              </div>
+              <div>
+                <div class="text-sm font-bold text-slate-900 dark:text-white">
+                  ${t.customerName || 'Walk-in'} ${t.plate ? `<span class="ml-1.5 px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[11px] font-mono font-bold">${t.plate}</span>` : ''}
+                </div>
+                <div class="text-xs text-slate-500">
+                  ${(t.items || []).map(i => i.name).join(' + ')} • Logged by <strong class="text-sky-600 dark:text-sky-400">${t.recordedBy || 'Partner'}</strong>
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="font-extrabold text-sm text-slate-900 dark:text-white">${money(t.total)}</span>
+              ${t.status === 'Paid'
+                ? `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">Paid</span>`
+                : `<button onclick="markTicketPaid('${t.id}')" class="px-3 py-1 rounded-full text-xs font-bold bg-amber-500 text-slate-950 hover:bg-amber-400">Mark Paid</button>`
+              }
+            </div>
+          </div>
+        `).join('');
+      }
+
+      renderChart();
+    }
+
+    function renderChart() {
+      const ctx = document.getElementById('washChart');
+      if (!ctx) return;
+      const isDark = window.appState.darkMode;
+      const textCol = isDark ? '#94a3b8' : '#64748b';
+      const gridCol = isDark ? 'rgba(148,163,184,0.1)' : 'rgba(148,163,184,0.2)';
+
+      const tickets = window.appState.tickets || [];
+      const expenses = window.appState.expenses || [];
+      const labels = [];
+      const inData = [];
+      const outData = [];
+      const now = new Date();
+
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        labels.push(d.toLocaleString('default', { month: 'short' }));
+        inData.push(tickets.filter(t => t.status === 'Paid' && (t.date || '').startsWith(ym)).reduce((s, t) => s + (t.total || 0), 0));
+        outData.push(expenses.filter(e => (e.date || '').startsWith(ym)).reduce((s, e) => s + (e.amount || 0), 0));
+      }
+
+      if (chartInstance) chartInstance.destroy();
+      chartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            { label: 'Wash Cash In (R)', data: inData, backgroundColor: '#10b981', borderRadius: 6 },
+            { label: 'Soap & Expenses Out (R)', data: outData, backgroundColor: '#f43f5e', borderRadius: 6 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: textCol, usePointStyle: true } } },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: textCol } },
+            y: { grid: { color: gridCol }, ticks: { color: textCol } }
+          }
+        }
+      });
+    }
+
+    // ==================== 2. RING UP POS & TICKETS ====================
+    function openWashModal(prefillCustId = 'WALKIN') {
+      currentWashCart = [];
+      const customers = window.appState.customers || [];
+      const sel = document.getElementById('wash-cust-select');
+      sel.innerHTML = `<option value="WALKIN">Walk-in Cash Customer</option>` +
+        customers.map(c => `<option value="${c.id}">${c.name} (${c.type})</option>`).join('');
+      sel.value = prefillCustId;
+
+      document.getElementById('wash-plate').value = '';
+      document.getElementById('wash-car').value = '';
+      if (prefillCustId !== 'WALKIN') onSelectWashCustomer();
+
+      // Render custom package buttons
+      const packages = window.appState.packages || [];
+      const btnGrid = document.getElementById('wash-quick-buttons');
+      if (!packages.length) {
+        btnGrid.innerHTML = `<div class="col-span-full text-center text-xs text-slate-400 py-3">No wash packages defined yet. Switch to "Price List" tab to add your services!</div>`;
+      } else {
+        btnGrid.innerHTML = packages.map(p => `
+          <button type="button" onclick="addPackageToWash('${p.id}')" class="p-3.5 rounded-2xl border-2 border-slate-200 dark:border-slate-700 hover:border-sky-500 active:scale-95 bg-white dark:bg-slate-800 text-left transition-all">
+            <div class="font-extrabold text-xs text-slate-900 dark:text-white leading-snug">${p.name}</div>
+            <div class="text-sm font-extrabold text-sky-600 dark:text-sky-400 mt-1">${money(p.price)}</div>
+          </button>
+        `).join('');
+      }
+
+      renderWashCart();
+      document.getElementById('modal-wash').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function onSelectWashCustomer() {
+      const id = document.getElementById('wash-cust-select').value;
+      const c = (window.appState.customers || []).find(x => x.id === id);
+      if (c) {
+        document.getElementById('wash-plate').value = c.plate || '';
+        document.getElementById('wash-car').value = c.car || '';
+        if (c.type === 'Fleet Account') {
+          document.querySelector('input[name="wash-payment"][value="Fleet Tab"]').checked = true;
+        }
+      }
+    }
+
+    function addPackageToWash(pkgId) {
+      const pkg = (window.appState.packages || []).find(p => p.id === pkgId);
+      if (!pkg) return;
+      currentWashCart.push({ name: pkg.name, price: pkg.price });
+      renderWashCart();
+    }
+
+    function clearWashSelection() {
+      currentWashCart = [];
+      renderWashCart();
+    }
+
+    function renderWashCart() {
+      const box = document.getElementById('wash-selected-items');
+      if (!currentWashCart.length) {
+        box.innerHTML = `<div class="text-slate-400 py-2 text-center">Tap a package button above to start...</div>`;
+        document.getElementById('wash-total-display').textContent = money(0);
+        return;
+      }
+
+      box.innerHTML = currentWashCart.map((item, idx) => `
+        <div class="flex items-center justify-between py-1">
+          <span class="font-semibold text-slate-800 dark:text-slate-200">${item.name}</span>
+          <div class="flex items-center gap-2">
+            <span class="font-bold">${money(item.price)}</span>
+            <button type="button" onclick="currentWashCart.splice(${idx}, 1); renderWashCart();" class="text-rose-500 font-bold px-1">✕</button>
+          </div>
+        </div>
+      `).join('');
+
+      const total = currentWashCart.reduce((s, i) => s + i.price, 0);
+      document.getElementById('wash-total-display').textContent = money(total);
+    }
+
+    async function saveWashTicket(e) {
+      e.preventDefault();
+      if (!currentWashCart.length) {
+        toast('Tap at least one wash package button first!', true);
+        return;
+      }
+
+      const plate = document.getElementById('wash-plate').value.trim().toUpperCase();
+      if (!plate) {
+        toast('Please enter number plate', true);
+        return;
+      }
+
+      const custId = document.getElementById('wash-cust-select').value;
+      const custObj = (window.appState.customers || []).find(c => c.id === custId);
+      const customerName = custObj ? custObj.name : 'Walk-in Cash Customer';
+      const car = document.getElementById('wash-car').value.trim();
+      const status = document.querySelector('input[name="wash-payment"]:checked').value;
+      const total = currentWashCart.reduce((s, i) => s + i.price, 0);
+
+      const ticketId = 't_' + Date.now();
+      const ticket = {
+        id: ticketId,
+        number: 'W-' + (1001 + (window.appState.tickets || []).length),
+        date: new Date().toISOString().split('T')[0],
+        customerId: custId,
+        customerName,
+        plate,
+        car,
+        items: [...currentWashCart],
+        total,
+        status,
+        recordedBy: window.appState.partnerName
+      };
+
+      closeModal('modal-wash');
+      await window.dbSaveDoc('tickets', ticketId, ticket);
+      toast(status === 'Paid' ? `Wash paid (${money(total)})!` : `Added to ${customerName}'s Fleet Tab!`);
+    }
+
+    async function markTicketPaid(id) {
+      const t = (window.appState.tickets || []).find(x => x.id === id);
+      if (t) {
+        await window.dbSaveDoc('tickets', id, { ...t, status: 'Paid' });
+        toast(`Ticket ${t.number} marked as Paid!`);
+      }
+    }
+
+    async function deleteTicket(id) {
+      await window.dbDeleteDoc('tickets', id);
+      toast('Ticket deleted');
+    }
+
+    function setTicketFilter(f) {
+      currentTicketFilter = f;
+      document.querySelectorAll('.tfilter-btn').forEach(b => {
+        if (b.dataset.tfilter === f) {
+          b.className = 'tfilter-btn px-3.5 py-2 rounded-xl text-xs font-bold bg-sky-500 text-slate-950';
+        } else {
+          b.className = 'tfilter-btn px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300';
+        }
+      });
+      renderTickets();
+    }
+
+    function renderTickets() {
+      const tickets = window.appState.tickets || [];
+      const list = tickets.filter(t => currentTicketFilter === 'ALL' || t.status === currentTicketFilter);
+      const tbody = document.getElementById('tickets-table-body');
+      if (!list.length) {
+        tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-xs text-slate-400">No wash tickets here.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = list.map(t => `
+        <tr class="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
+          <td class="py-3.5 px-4">
+            <div class="font-bold text-slate-900 dark:text-white">${t.number}</div>
+            <div class="text-xs text-slate-400">${t.date}</div>
+          </td>
+          <td class="py-3.5 px-4">
+            <div class="font-bold text-slate-800 dark:text-slate-200">${t.customerName}</div>
+            <div class="text-xs text-slate-500">${[t.plate, t.car].filter(Boolean).join(' • ') || 'Standard Vehicle'}</div>
+          </td>
+          <td class="py-3.5 px-4 text-xs text-slate-600 dark:text-slate-300">${(t.items || []).map(i => i.name).join(', ')}</td>
+          <td class="py-3.5 px-4 text-xs font-bold text-sky-600 dark:text-sky-400">${t.recordedBy || 'Partner'}</td>
+          <td class="py-3.5 px-4 font-extrabold text-slate-900 dark:text-white">${money(t.total)}</td>
+          <td class="py-3.5 px-4">
+            ${t.status === 'Paid'
+              ? `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">Paid</span>`
+              : `<button onclick="markTicketPaid('${t.id}')" class="px-3 py-1 rounded-full text-xs font-bold bg-amber-500 text-slate-950 hover:bg-amber-400">Fleet Tab • Tap to Pay</button>`
+            }
+          </td>
+          <td class="py-3.5 px-4 text-right space-x-1">
+            <button onclick="printReceipt('${t.id}')" class="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-sky-500 hover:text-slate-950 text-xs font-bold">Receipt</button>
+            <button onclick="deleteTicket('${t.id}')" class="p-1.5 text-slate-400 hover:text-rose-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function printReceipt(id) {
+      const t = (window.appState.tickets || []).find(x => x.id === id);
+      if (!t) return;
+      const s = window.appState;
+      document.getElementById('print-receipt-area').innerHTML = `
+        <div class="text-center border-b border-dashed border-slate-300 pb-4">
+          <div class="text-xl font-extrabold uppercase tracking-tight">${s.shopName}</div>
+          <div class="text-xs text-slate-500">${s.address}</div>
+          <div class="text-xs text-slate-500">Tel / WhatsApp: ${s.phone}</div>
+        </div>
+        <div class="flex justify-between text-xs text-slate-600">
+          <span>Ticket: <strong>${t.number}</strong></span>
+          <span>Date: <strong>${t.date}</strong></span>
+        </div>
+        <div class="text-xs bg-slate-100 p-2.5 rounded-lg">
+          <div><strong>Customer:</strong> ${t.customerName}</div>
+          ${t.plate || t.car ? `<div><strong>Vehicle:</strong> ${t.plate} ${t.car}</div>` : ''}
+          <div><strong>Logged By:</strong> ${t.recordedBy || 'Partner'}</div>
+        </div>
+        <div class="divide-y divide-slate-200 border-y border-slate-200">
+          ${(t.items || []).map(i => `
+            <div class="py-2 flex justify-between text-xs">
+              <span>${i.name}</span>
+              <span class="font-bold">${money(i.price)}</span>
+            </div>
+          `).join('')}
+        </div>
+        <div class="flex justify-between text-base font-extrabold pt-1">
+          <span>TOTAL (${(t.status || 'PAID').toUpperCase()})</span>
+          <span>${money(t.total)}</span>
+        </div>
+        <div class="text-center text-[11px] text-slate-400 pt-3 border-t border-dashed border-slate-300">
+          Thank you for washing with ${s.shopName}! Drive safely.
+        </div>
+      `;
+      document.getElementById('modal-receipt').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    // ==================== 3. CUSTOM WASH PRICE LIST ====================
+    function openPackageModal(editId = null) {
+      document.getElementById('pkg-edit-id').value = editId || '';
+      document.getElementById('modal-pkg-title').textContent = editId ? 'Edit Wash Package' : 'Add Wash Package';
+
+      if (editId) {
+        const p = (window.appState.packages || []).find(x => x.id === editId);
+        if (p) {
+          document.getElementById('pkg-name').value = p.name;
+          document.getElementById('pkg-price').value = p.price;
+          document.getElementById('pkg-desc').value = p.desc || '';
+        }
+      } else {
+        document.getElementById('pkg-name').value = '';
+        document.getElementById('pkg-price').value = '';
+        document.getElementById('pkg-desc').value = '';
+      }
+
+      document.getElementById('modal-package').classList.remove('hidden');
+    }
+
+    async function savePackageForm(e) {
+      e.preventDefault();
+      const editId = document.getElementById('pkg-edit-id').value;
+      const id = editId || 'p_' + Date.now();
+      const pkg = {
+        id,
+        name: document.getElementById('pkg-name').value.trim(),
+        price: parseFloat(document.getElementById('pkg-price').value) || 0,
+        desc: document.getElementById('pkg-desc').value.trim()
+      };
+
+      closeModal('modal-package');
+      await window.dbSaveDoc('packages', id, pkg);
+      toast('Wash package saved! Synced live to partner.');
+    }
+
+    async function deletePackage(id) {
+      await window.dbDeleteDoc('packages', id);
+      toast('Package removed');
+    }
+
+    function renderPackages() {
+      const list = window.appState.packages || [];
+      const grid = document.getElementById('packages-grid');
+      if (!list.length) {
+        grid.innerHTML = `<div class="col-span-full py-10 text-center text-xs text-slate-400">No wash packages found. Click "+ Add Wash Package" to set up your price list!</div>`;
+        return;
+      }
+
+      grid.innerHTML = list.map(p => `
+        <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between space-y-3">
+          <div>
+            <div class="flex items-start justify-between gap-2">
+              <h4 class="font-extrabold text-base text-slate-900 dark:text-white">${p.name}</h4>
+              <div class="flex items-center gap-1">
+                <button onclick="openPackageModal('${p.id}')" class="p-1.5 text-slate-400 hover:text-sky-500"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
+                <button onclick="deletePackage('${p.id}')" class="p-1.5 text-slate-400 hover:text-rose-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+              </div>
+            </div>
+            <p class="text-xs text-slate-500 mt-1">${p.desc || 'Standard carwash service'}</p>
+          </div>
+          <div class="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+            <span class="text-xs text-slate-400 font-bold uppercase">Price</span>
+            <span class="text-xl font-extrabold text-sky-600 dark:text-sky-400">${money(p.price)}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // ==================== 4. CHEMICALS & SOAP SUPPLIES ====================
+    function openSupplyModal() {
+      document.getElementById('sup-name').value = '';
+      document.getElementById('sup-stock').value = '3';
+      document.getElementById('sup-low').value = '1';
+      document.getElementById('modal-supply').classList.remove('hidden');
+    }
+
+    async function saveSupplyForm(e) {
+      e.preventDefault();
+      const id = 's_' + Date.now();
+      const sup = {
+        id,
+        name: document.getElementById('sup-name').value.trim(),
+        stock: parseInt(document.getElementById('sup-stock').value) || 0,
+        low: parseInt(document.getElementById('sup-low').value) || 1
+      };
+      closeModal('modal-supply');
+      await window.dbSaveDoc('supplies', id, sup);
+      toast('Supply item saved!');
+    }
+
+    async function changeSupplyStock(id, delta) {
+      const s = (window.appState.supplies || []).find(x => x.id === id);
+      if (s) {
+        const newStock = Math.max(0, (s.stock || 0) + delta);
+        await window.dbSaveDoc('supplies', id, { ...s, stock: newStock });
+      }
+    }
+
+    function renderSupplies() {
+      const list = window.appState.supplies || [];
+      const box = document.getElementById('supplies-list');
+      if (!list.length) {
+        box.innerHTML = `<div class="col-span-full py-4 text-center text-xs text-slate-400">No supply items tracked.</div>`;
+        return;
+      }
+
+      box.innerHTML = list.map(s => {
+        const isLow = (s.stock || 0) <= (s.low || 1);
+        return `
+          <div class="bg-white dark:bg-slate-900 p-4 rounded-2xl border ${isLow ? 'border-rose-400 dark:border-rose-700' : 'border-slate-200 dark:border-slate-800'} flex items-center justify-between gap-3">
+            <div>
+              <div class="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                <span>${s.name}</span>
+                ${isLow ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-500/15 text-rose-600">LOW STOCK</span>` : ''}
+              </div>
+              <div class="text-xs text-slate-500 mt-0.5">Low warning at ${s.low} units</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="changeSupplyStock('${s.id}', -1)" class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 font-extrabold text-sm text-slate-800 dark:text-slate-200 hover:bg-slate-200">-1</button>
+              <span class="w-8 text-center font-extrabold text-sm ${isLow ? 'text-rose-600' : ''}">${s.stock || 0}</span>
+              <button onclick="changeSupplyStock('${s.id}', 1)" class="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 font-extrabold text-sm text-slate-800 dark:text-slate-200 hover:bg-slate-200">+1</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ==================== 5. REGULARS & FLEETS ====================
+    function openCustomerModal() {
+      document.getElementById('cust-name').value = '';
+      document.getElementById('cust-phone').value = '';
+      document.getElementById('cust-plate').value = '';
+      document.getElementById('cust-car').value = '';
+      document.getElementById('modal-customer').classList.remove('hidden');
+    }
+
+    async function saveCustomerForm(e) {
+      e.preventDefault();
+      const id = 'c_' + Date.now();
+      const cust = {
+        id,
+        name: document.getElementById('cust-name').value.trim(),
+        type: document.getElementById('cust-type').value,
+        phone: document.getElementById('cust-phone').value.trim(),
+        plate: document.getElementById('cust-plate').value.trim().toUpperCase(),
+        car: document.getElementById('cust-car').value.trim()
+      };
+      closeModal('modal-customer');
+      await window.dbSaveDoc('customers', id, cust);
+      toast('Customer saved to shared database!');
+    }
+
+    async function deleteCustomer(id) {
+      await window.dbDeleteDoc('customers', id);
+      toast('Customer deleted');
+    }
+
+    function renderCustomers() {
+      const q = document.getElementById('cust-search').value.toLowerCase();
+      const list = window.appState.customers || [];
+      const filtered = list.filter(c =>
+        [c.name, c.type, c.plate, c.car, c.phone].some(v => (v || '').toLowerCase().includes(q))
+      );
+
+      const grid = document.getElementById('customers-grid');
+      if (!filtered.length) {
+        grid.innerHTML = `<div class="col-span-full py-10 text-center text-xs text-slate-400">No regular or fleet customers found.</div>`;
+        return;
+      }
+
+      const tickets = window.appState.tickets || [];
+      grid.innerHTML = filtered.map(c => {
+        const custTickets = tickets.filter(t => t.customerId === c.id);
+        const owed = custTickets.filter(t => t.status === 'Fleet Tab').reduce((s, t) => s + (t.total || 0), 0);
+
+        return `
+          <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between space-y-4">
+            <div>
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <span class="px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase bg-sky-500/10 text-sky-600 dark:text-sky-400">${c.type}</span>
+                  <h4 class="font-extrabold text-base text-slate-900 dark:text-white mt-1">${c.name}</h4>
+                </div>
+                <button onclick="deleteCustomer('${c.id}')" class="text-slate-400 hover:text-rose-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+              </div>
+              <div class="mt-2 space-y-1 text-xs text-slate-500">
+                <div>🚗 <strong>${c.plate || 'No Plate'}</strong> ${c.car ? `— ${c.car}` : ''}</div>
+                <div>📱 ${c.phone || 'No phone'}</div>
+                <div>🧼 Washes Logged: <strong>${custTickets.length}</strong> ${owed > 0 ? `• <span class="text-amber-600 font-extrabold">Owes ${money(owed)}</span>` : ''}</div>
+              </div>
+            </div>
+
+            <button onclick="openWashModal('${c.id}')" class="w-full py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-extrabold flex items-center justify-center gap-1.5">
+              <i data-lucide="plus-circle" class="w-4 h-4"></i>
+              <span>Ring Up Wash for ${c.name.split(' ')[0]}</span>
+            </button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ==================== 6. EXPENSES ====================
+    function openExpenseModal() {
+      document.getElementById('exp-desc').value = '';
+      document.getElementById('exp-amount').value = '';
+      document.getElementById('exp-date').value = new Date().toISOString().split('T')[0];
+      document.getElementById('modal-expense').classList.remove('hidden');
+    }
+
+    async function saveExpenseForm(e) {
+      e.preventDefault();
+      const id = 'e_' + Date.now();
+      const exp = {
+        id,
+        desc: document.getElementById('exp-desc').value.trim(),
+        cat: document.getElementById('exp-cat').value,
+        amount: parseFloat(document.getElementById('exp-amount').value) || 0,
+        date: document.getElementById('exp-date').value,
+        recordedBy: window.appState.partnerName
+      };
+
+      closeModal('modal-expense');
+      await window.dbSaveDoc('expenses', id, exp);
+      toast('Expense logged!');
+    }
+
+    async function deleteExpense(id) {
+      await window.dbDeleteDoc('expenses', id);
+      toast('Expense deleted');
+    }
+
+    function renderExpenses() {
+      const list = window.appState.expenses || [];
+      const tbody = document.getElementById('expenses-table-body');
+      if (!list.length) {
+        tbody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-xs text-slate-400">No expenses logged yet.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = list.map(e => `
+        <tr class="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
+          <td class="py-3.5 px-4 text-xs text-slate-500">${e.date}</td>
+          <td class="py-3.5 px-4 font-bold text-slate-900 dark:text-white">${e.desc}</td>
+          <td class="py-3.5 px-4"><span class="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs">${e.cat}</span></td>
+          <td class="py-3.5 px-4 text-xs font-bold text-sky-600 dark:text-sky-400">${e.recordedBy || 'Partner'}</td>
+          <td class="py-3.5 px-4 font-extrabold text-rose-600 dark:text-rose-400">-${money(e.amount)}</td>
+          <td class="py-3.5 px-4 text-right">
+            <button onclick="deleteExpense('${e.id}')" class="p-1.5 text-slate-400 hover:text-rose-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function exportExpensesCSV() {
+      const list = window.appState.expenses || [];
+      const rows = [['Date', 'Description', 'Category', 'Logged By', 'Amount'], ...list.map(e => [e.date, `"${e.desc}"`, e.cat, `"${e.recordedBy || 'Partner'}"`, e.amount])];
+      const blob = new Blob([rows.map(r => r.join(',')).join('\n')], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `Carwash_Expenses_${window.appState.shopCode}.csv`;
+      a.click();
+      toast('CSV downloaded!');
+    }
+
+    function downloadBackup() {
+      const dataStr = JSON.stringify(window.appState, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `ShineBay_Backup_${window.appState.shopCode}_${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      toast('Backup file saved!');
+    }
+
+    async function resetShopData() {
+      const tickets = window.appState.tickets || [];
+      const expenses = window.appState.expenses || [];
+      for (const t of tickets) await window.dbDeleteDoc('tickets', t.id);
+      for (const e of expenses) await window.dbDeleteDoc('expenses', e.id);
+      toast('All shop tickets and expenses cleared for Day 1!');
+    }
+  </script>
+</body>
+</html>
