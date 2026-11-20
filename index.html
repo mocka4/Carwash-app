@@ -814,9 +814,14 @@
 
     // Global Fallbacks & Firebase Init
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'shinebay-carwash-app';
-    const firebaseConfig = typeof __firebase_config !== 'undefined' 
-      ? JSON.parse(__firebase_config) 
-      : { apiKey: "demo-key", authDomain: "demo.firebaseapp.com", projectId: "demo-proj" };
+    const firebaseConfig = {
+      apiKey: "AIzaSyAjovLkyOhQgRNaHrtFYlNrzJAeFfAheqQ",
+      authDomain: "carwash-business-4b3e1.firebaseapp.com",
+      projectId: "carwash-business-4b3e1",
+      storageBucket: "carwash-business-4b3e1.firebasestorage.app",
+      messagingSenderId: "171062055560",
+      appId: "1:171062055560:web:173b19ad08c81a035d453d"
+    };
 
     let firebaseApp, auth, db;
     let currentUser = null;
