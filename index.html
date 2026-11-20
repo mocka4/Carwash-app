@@ -168,7 +168,7 @@
               <!-- Real-Time Sync Indicator -->
               <span id="sync-status-badge" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                 <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span id="sync-status-text">Synced Live</span>
+                <span id="sync-status-text">Connecting...</span>
               </span>
             </div>
             <p id="header-subtitle" class="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">Real-time business updates across both partners' phones</p>
@@ -876,7 +876,7 @@
         });
       } catch (err) {
         console.warn("Firestore running in fallback mode:", err);
-        updateSyncUI(false, "Local Offline Mode");
+        updateSyncUI(false, "Offline: " + (err.code || err.message));
       }
     }
 
@@ -920,7 +920,7 @@
           window.renderAll();
         }, (err) => {
           console.error(`Snapshot error on ${colName}:`, err);
-          updateSyncUI(false, "Sync Error");
+          updateSyncUI(false, "Sync Error: " + (err.code || err.message));
         });
 
         unsubs.push(unsub);
@@ -929,14 +929,21 @@
 
     // Helper Write Operations
     window.dbSaveDoc = async function(colKey, id, data) {
-      if (!currentUser || !db) return;
+      if (!currentUser || !db) { alert("NOT SAVED: not connected to the shared database yet. Check the badge at the top."); return; }
       const cleanCode = window.appState.shopCode.trim().replace(/[^a-zA-Z0-9_-]/g, '') || 'SHINE-2026';
       const colName = `shop_${cleanCode}_${colKey}`;
       try {
         const docRef = doc(db, 'artifacts', appId, 'public', 'data', colName, id);
-        await setDoc(docRef, { ...data, updatedAt: new Date().toISOString() }, { merge: true });
+        await Promise.race([
+          setDoc(docRef, { ...data, updatedAt: new Date().toISOString() }, { merge: true }),
+          new Promise((_, rej) => setTimeout(() => rej({ code: 'timeout' }), 8000))
+        ]);
       } catch (err) {
         console.error("Firestore Save Error:", err);
+        updateSyncUI(false, "Save failed: " + (err.code || err.message));
+        alert(err.code === 'timeout'
+          ? "NOT REACHING FIREBASE: the save was never confirmed. In Firebase console make sure Firestore Database is created (Build > Firestore Database > Create database) and the rules are published."
+          : "NOT SAVED to shared database: " + (err.code || err.message));
       }
     };
 
@@ -949,6 +956,7 @@
         await deleteDoc(docRef);
       } catch (err) {
         console.error("Firestore Delete Error:", err);
+        updateSyncUI(false, "Delete failed: " + (err.code || err.message));
       }
     };
 
